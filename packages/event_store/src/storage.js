@@ -535,6 +535,95 @@ class Storage {
         });
     }
 
+    async getRawDeploys(criteria, limit, offset, orderBy, orderDirection) {
+        return await this.models.RawDeployProcessedEvent.findAndCountAll({
+
+            attributes: [
+                "deployHash",
+                [
+                    sequelize.literal('jsonBody->>\'$.DeployProcessed.block_hash\''),
+                    "blockHash"
+                ],
+                [
+                    sequelize.literal('jsonBody->>\'$.DeployProcessed.account\''),
+                    "account"
+                ],
+                [
+                    sequelize.literal('JSON_EXTRACT( jsonBody->>\'$.DeployProcessed.execution_result.*.cost\', \'$[0]\')'),
+                    "cost"
+                ],
+                [
+                    sequelize.literal('JSON_EXTRACT(jsonBody->>\'$.DeployProcessed.execution_result.*.error_message\', \'$[0]\')'),
+                    "error_message"
+                ],
+                [
+                    sequelize.literal('jsonBody->>\'$.DeployProcessed.timestamp\''),
+                    "timestamp"
+                ],
+                [
+                    sequelize.literal('JSON_EXTRACT(jsonBody->>\'$.DeployProcessed.execution_result.*.transfers\', \'$[0]\')'),
+                    "transfers"
+                ],
+                // [
+                //     sequelize.literal('JSON_EXTRACT(jsonBody->>\'$.DeployProcessed.execution_result\', \'$[0]\')'),
+                //     "execution_result"
+                // ],
+                // [
+                //     sequelize.literal('JSON_EXTRACT(jsonBody, \'$**.WriteTransfer\')'),
+                //     "transfer_details"
+                // ],
+                // [
+                //     sequelize.literal('JSON_EXTRACT(jsonBody, \'$**.WriteBid\')'),
+                //     "bid_details"
+                // ],
+                // [
+                //     sequelize.literal('JSON_EXTRACT(jsonBody, \'$**.WriteWithdraw\')'),
+                //     "withdraw_details"
+                // ],
+                [
+                    sequelize.literal('JSON_EXTRACT( JSON_EXTRACT(jsonBody, \'$**.WriteTransfer.amount\'), \'$[0]\')'),
+                    "amount"
+                ],
+                [
+                    sequelize.literal('JSON_EXTRACT( JSON_EXTRACT(jsonBody, \'$**.WriteTransfer.id\'), \'$[0]\')'),
+                    "transfer_id"
+                ],
+                [
+                    sequelize.literal('REPLACE(JSON_UNQUOTE(JSON_EXTRACT( JSON_EXTRACT(jsonBody, \'$**.WriteTransfer.to\'), \'$[0]\')), \'account-hash-\', \'\')'),
+                    "transfer_recipient_account_hash"
+                ],
+                [
+                    sequelize.literal('IF (JSON_EXTRACT( jsonBody->>\'$.DeployProcessed.execution_result.*.cost\', \'$[0]\') = "10000" AND JSON_EXTRACT(jsonBody, \'$**.WriteWithdraw\') IS NULL, 1, 0 )'),
+                    "is_transfer"
+                ],
+                [
+                    sequelize.literal('IF (JSON_EXTRACT(jsonBody, \'$**.WriteBid\') IS NOT NULL AND JSON_EXTRACT(jsonBody, \'$**.WriteWithdraw\') IS NULL, 1, 0 )'),
+                    "is_delegate"
+                ],
+                [
+                    sequelize.literal('IF (JSON_EXTRACT(jsonBody, \'$**.WriteWithdraw\') IS NOT NULL , 1, 0 )'),
+                    "is_undelegate"
+                ],
+                [
+                    sequelize.literal('JSON_EXTRACT( JSON_EXTRACT(jsonBody, \'$**.WriteBid.validator_public_key\'), \'$[0]\')'),
+                    "delegate_undelegate_validator"
+                ],
+
+            ],
+            // @todo may no longer work with JSON path - needs alias
+            where: this.buildWhere(criteria, [sequelize.literal('jsonBody->>\'$.DeployProcessed.block_hash\''), sequelize.literal('jsonBody->>\'$.DeployProcessed.account\'')]),
+            limit: limit,
+            offset: offset,
+            // @todo may no longer work with JSON path - needs alias
+            order: this.buildOrder(
+                orderBy,
+                orderDirection,
+                ['cost', 'timestamp', 'errorMessage'],
+                [[sequelize.literal('jsonBody->>\'$.DeployProcessed.timestamp\''), 'DESC']]
+            ),
+        });
+    }
+
     async findRawDeploy(deployHash) {
         const rawEvent = await this.models.RawEvent.findOne({
             where: {

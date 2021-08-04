@@ -10,12 +10,12 @@ let httpServer = (models) => {
     const app = express();
     const storage = new Storage(models);
 
-    const sendPreparedPaginatedResponse = async (req, res, paginatedResult) => {
+    const sendPreparedPaginatedResponse = async (req, res, paginatedResult, asRawJson = false) => {
         const itemCount = paginatedResult.count;
         const pageCount = Math.ceil(paginatedResult.count / req.query.limit);
 
         const jsonRecords = await Promise.all(paginatedResult.rows.map(row => {
-            return row.toJSON();
+            return asRawJson ? row.dataValues : row.toJSON();
         }));
 
         if (req.query.with_amounts_in_currency_id && paginatedResult.rows.length > 0) {
@@ -182,6 +182,20 @@ let httpServer = (models) => {
             req.query.order_by,
             req.query.order_direction
         ));
+    });
+
+    // Deploys
+    app.get('/fulldeploys', async (req, res, next) => {
+
+        let deploys = await storage.getRawDeploys(
+            req.query,
+            req.query.limit,
+            req.skip,
+            req.query.order_by,
+            req.query.order_direction
+        );
+
+        await sendPreparedPaginatedResponse(req, res, deploys, true);
     });
 
     app.get([
